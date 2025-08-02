@@ -1,0 +1,68 @@
+apiVersion: collectors.grafana.com/v1alpha1
+kind: Alloy
+metadata:
+  name: mimir-metrics
+  namespace: grafana-alloy
+spec:
+  config: |
+    server:
+      log_level: info
+
+    # =====================
+    # = Kubernetes Targets =
+    # =====================
+    discovery.kubernetes "pods" {
+      role = "pod"
+    }
+
+    discovery.kubernetes "nodes" {
+      role = "node"
+    }
+
+    discovery.kubernetes "endpoints" {
+      role = "endpoints"
+    }
+
+    discovery.kubernetes "services" {
+      role = "service"
+    }
+
+    # =====================
+    # = Metrics 收集區段 =
+    # =====================
+    prometheus.scrape "k8s_pods" {
+      targets = discovery.kubernetes.pods.targets
+      relabel_configs = [
+        {
+          source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_scrape"]
+          action        = "keep"
+          regex         = "true"
+        },
+        {
+          source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_path"]
+          target_label  = "__metrics_path__"
+          regex         = "(.+)"
+          action        = "replace"
+        },
+        {
+          source_labels = ["__address__", "__meta_kubernetes_pod_annotation_prometheus_io_port"]
+          regex         = "(.+):(?:\\d+);(\\d+)"
+          replacement   = "$1:$2"
+          target_label  = "__address__"
+          action        = "replace"
+        }
+      ]
+    }
+
+    prometheus.scrape "k8s_nodes" {
+      targets = discovery.kubernetes.nodes.targets
+    }
+
+    # =====================
+    # = Metrics 發送區段 =
+    # =====================
+    prometheus.remote_write "default" {
+      endpoint {
+        url = "mimir-gateway.grafana.svc:80/api/v1/push"
+      }
+    }

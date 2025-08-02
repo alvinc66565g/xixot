@@ -1,0 +1,31 @@
+apiVersion: collectors.grafana.com/v1alpha1
+kind: Alloy
+metadata:
+  name: kube-events
+  namespace: grafana-alloy
+spec:
+  config: |
+    server {
+      log_level = "info"
+    }
+
+    discovery.kubernetes "events" {
+      role = "event"
+    }
+
+    prometheus.exporter.kubernetes_events "default" {
+      forward_to = [prometheus.remote_write.to_grafana.receiver]
+      events     = discovery.kubernetes.events.targets
+    }
+
+    prometheus.remote_write "to_grafana" {
+      endpoint {
+        url = "http://prometheus-us-central1.grafana.net/api/prom"
+
+        # 如果你有 Grafana Cloud Token：
+        basic_auth {
+          username = "<instance_id>"           # Grafana Cloud 的 instance ID
+          password = "<api_token>"             # API token
+        }
+      }
+    }

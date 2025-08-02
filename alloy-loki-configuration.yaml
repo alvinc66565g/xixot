@@ -1,0 +1,49 @@
+apiVersion: collectors.grafana.com/v1alpha1
+kind: Alloy
+metadata:
+  name: loki-logs
+  namespace: grafana-alloy
+spec:
+  config: |
+    server:
+      log_level: info
+
+    # =====================
+    # = Kubernetes Targets =
+    # =====================
+    discovery.kubernetes "pods" {
+      role = "pod"
+    }
+
+    discovery.kubernetes "nodes" {
+      role = "node"
+    }
+
+    discovery.kubernetes "endpoints" {
+      role = "endpoints"
+    }
+
+    discovery.kubernetes "services" {
+      role = "service"
+    }
+
+    prometheus.scrape "k8s_nodes" {
+      targets = discovery.kubernetes.nodes.targets
+    }
+
+    # =====================
+    # = Logs 收集區段 =
+    # =====================
+    loki.source.kubernetes "pods" {
+      label_keys        = ["namespace", "pod", "container"]
+      pipeline_stages   = [{ cri = {} }]
+    }
+
+    # =====================
+    # = Logs 發送區段 =
+    # =====================
+    loki.write "default" {
+      endpoint {
+        url = "http://loki-gateway.grafana.svc:80/loki/api/v1/push"
+      }
+    }
